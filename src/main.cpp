@@ -19,7 +19,7 @@ DFRobot_BloodOxygen_S_HardWareUart MAX30102(&Serial1, 9600);
 
 // WiFi settings
 // TODO : Replace with your WiFi credentials here
-const char *ssid = "Allumettes";
+const char *ssid = "Allumettes ";
 const char *password = "salutc'estmoichoupi";
 
 // MQTT Broker settings
@@ -28,7 +28,7 @@ const char *mqtt_broker = "broker.emqx.io";     // EMQX broker endpoint
 // const char *mqtt_topic1 = "dataCastres/topic1"; // MQTT topic
 const char *mqtt_topicMAC = "homeTrainerCastres/Group1-B/MAC"; // MQTT topic
 const char *mqtt_topicHeartBeatDFRobot = "homeTrainerCastres/Group1-B/HeartBeatDFRobot";
-const char *mqtt_topicHeartBeatSparkfun = "homeTrainerCastres/Group1-B/HeartBeatDFRobot";
+const char *mqtt_topicHeartBeatSparkfun = "homeTrainerCastres/Group1-B/HeartBeatSparkfun";
 const char *mqtt_topicSPO2 = "homeTrainerCastres/Group1-B/SPO2";
 const int mqtt_port = 1883;                     // MQTT port (TCP)
 String client_id = "Arduino-";
