@@ -19,17 +19,25 @@ DFRobot_BloodOxygen_S_HardWareUart MAX30102(&Serial1, 9600);
 
 // WiFi settings
 // TODO : Replace with your WiFi credentials here
-const char *ssid = "PersonnalSpy";
-const char *password = "dansl&spacepersonevousentendra";
+const char *ssid = "Allumettes";
+const char *password = "salutc'estmoichoupi";
 
 // MQTT Broker settings
 // TODO : Update with your MQTT broker settings here if needed
 const char *mqtt_broker = "broker.emqx.io";     // EMQX broker endpoint
 // const char *mqtt_topic1 = "dataCastres/topic1"; // MQTT topic
-const char *mqtt_topic2 = "homeTrainerCastres/Group1-B/MAC"; // MQTT topic
+const char *mqtt_topicMAC = "homeTrainerCastres/Group1-B/MAC"; // MQTT topic
+const char *mqtt_topicHeartBeatDFRobot = "homeTrainerCastres/Group1-B/HeartBeatDFRobot";
+const char *mqtt_topicHeartBeatSparkfun = "homeTrainerCastres/Group1-B/HeartBeatDFRobot";
+const char *mqtt_topicSPO2 = "homeTrainerCastres/Group1-B/SPO2";
 const int mqtt_port = 1883;                     // MQTT port (TCP)
-String client_id = "ArduinoClient-";
+String client_id = "Arduino-";
 String MAC_address = "";
+
+int BPM = 0;
+int beat_old = 0;
+float beats[500];
+int beatIndex;
 
 // Other global variables
 static unsigned long lastPublishTime = 0;
@@ -48,6 +56,9 @@ void setup()
   mqtt_client.setCallback(mqttCallback);
   connectToMQTTBroker();
 
+  pinMode(10, INPUT);
+  pinMode(11, INPUT);
+
   while (false == MAX30102.begin())
   {
     Serial.println("init fail!");
@@ -56,7 +67,27 @@ void setup()
   Serial.println("init success!");
   Serial.println("start measuring...");
   MAX30102.sensorStartCollect();
+/*
+  plot.Begin();
+  plot.AddTimeGraph("ECG graph", 500, "Vital constant", graphPoint);
+  */
 }
+
+void calculateBPM () 
+{  
+  int beat_new = millis();    // get the current millisecond
+  int diff = beat_new - beat_old;    // find the time between the last two beats
+  float currentBPM = 60000 / diff;    // convert to beats per minute
+  beats[beatIndex] = currentBPM;  // store to array to convert the average
+  float total = 0.0;
+  for (int i = 0; i < 500; i++){
+    total += beats[i];
+  }
+  BPM = int(total / 500);
+  beat_old = beat_new;
+  beatIndex = (beatIndex + 1) % 500;  // cycle through the array instead of using FIFO queue
+}
+
 
 void printMacAddress()
 {
@@ -104,10 +135,13 @@ void connectToMQTTBroker()
     {
       Serial.println("Connected to MQTT broker");
       // mqtt_client.subscribe(mqtt_topic1);
-      mqtt_client.subscribe(mqtt_topic2);
+      mqtt_client.subscribe(mqtt_topicMAC);
       // Publish message upon successful connection
-      String message = "Hello EMQX I'm " + client_id;
-      // mqtt_client.publish(mqtt_topic1, message.c_str());
+
+      mqtt_client.subscribe(mqtt_topicHeartBeatSparkfun);
+      mqtt_client.subscribe(mqtt_topicHeartBeatDFRobot);
+      mqtt_client.subscribe(mqtt_topicSPO2);
+
     }
     else
     {
@@ -154,17 +188,22 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
 
 void loop()
 {
+  /*
+  if((digitalRead(10) == 1)||(digitalRead(11) == 1)){
+    Serial.println('!');
+  }
+  else{
+    // Serial.println(analogRead(A0));
+    graphPoint = analogRead(A0);
+  }
+  */
+
+  //plot.Plot();
+
+  //delay(1);
+
   MAX30102.getHeartbeatSPO2();
-  Serial.print("SPO2 is : ");
-  Serial.print(MAX30102._sHeartbeatSPO2.SPO2);
-  Serial.println("%");
-  Serial.print("heart rate is : ");
-  Serial.print(MAX30102._sHeartbeatSPO2.Heartbeat);
-  Serial.println(" Times/min");
-  Serial.print("Temperature value of the board is : ");
-  Serial.print(MAX30102.getTemperature_C());
-  Serial.println(" ℃");
-  delay(4000);
+  // delay(4000);
 
   if (!mqtt_client.connected())
   {
@@ -173,14 +212,22 @@ void loop()
   mqtt_client.loop();
   // TODO: Add your main code here, to run repeatedly (e.g., sensor readings, publishing messages, etc. )
   // Example below : Publish a message every 10 seconds
+
+  calculateBPM();
+
   unsigned long currentTime = millis();
-  if (currentTime - lastPublishTime >= 10000) // 10 seconds
+  if (currentTime - lastPublishTime >= 5000) // 10 seconds
   {
-    String message = "Hello EMQX I'm " + client_id + " at " + String(currentTime / 1000) + " seconds";
-    // mqtt_client.publish(mqtt_topic1, message.c_str());
-    Serial.println("Published message: " + message);
     lastPublishTime = currentTime;
 
-    mqtt_client.publish(mqtt_topic2, MAC_address.c_str());
+    mqtt_client.publish(mqtt_topicMAC, MAC_address.c_str());
+
+    Serial.println(MAC_address);
+    Serial.println(MAX30102._sHeartbeatSPO2.SPO2);
+
+    mqtt_client.publish(mqtt_topicSPO2, std::to_string(MAX30102._sHeartbeatSPO2.SPO2).c_str());
+    mqtt_client.publish(mqtt_topicHeartBeatDFRobot, std::to_string(MAX30102._sHeartbeatSPO2.Heartbeat).c_str());
+
+    mqtt_client.publish(mqtt_topicHeartBeatSparkfun, std::to_string(BPM).c_str());
   }
 }
